@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Cleaning and File Upload</title>
+    <script src="js/main.js" defer></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 20px;
+        }
+        .checklist, .form-group {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            margin-bottom: 20px;
+        }
+        .checklist label, .form-group label {
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        .checklist input, .form-group input {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>    
+    <h1>How would you like to clean your data?</h1>
+
+    <!-- Data cleaning options checklist -->
+    <div class="checklist">
+        <label>
+            <input type="checkbox" class="option" value="remove-na">
+            Remove NA's
+        </label>
+        <label>
+            <input type="checkbox" class="option" value="replace-na">
+            Replace NA's with average
+        </label>
+        <label>
+            <input type="checkbox" class="option" value="standardize">
+            Standardize data
+        </label>
+        <label>
+            <input type="checkbox" class="option" value="remove-outliers">
+            Remove outliers
+        </label>
+        <label>
+            <input type="checkbox" class="option" value="remove-duplicates">
+            Remove Duplicates
+        </label>
+    </div>
+
+    <!-- File upload and email form -->
+    <form id="uploadForm">
+        <div class="form-group">
+            <label for="emailInput">Enter your email:</label>
+            <input type="email" id="emailInput" name="email" required placeholder="you@example.com">
+        </div>
+        
+        <div class="form-group">
+            <label for="fileInput">Choose a file:</label>
+            <input type="file" id="fileInput" name="file" required>
+        </div>
+
+        <button type="submit">Upload Your File!</button>
+    </form>
+
+    <div id="message"></div>
+</body>
+</html>
