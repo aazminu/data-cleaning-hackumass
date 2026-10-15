@@ -10,8 +10,18 @@ function isMissing(value) {
 function coerceNumeric(value) {
     if (typeof value === 'number' && Number.isFinite(value)) return value;
     if (typeof value !== 'string') return null;
-    const cleaned = value.trim().replace(/^[£$€]/, '').replace(/,/g, '');
-    if (!cleaned || !/^[-+]?\d*(\.\d+)?$/.test(cleaned) || cleaned === '-' || cleaned === '+' || cleaned === '.') {
+    let cleaned = value.trim();
+    if (!cleaned) return null;
+    let isAccountingNegative = false;
+    if (cleaned.startsWith('(') && cleaned.endsWith(')')) {
+        isAccountingNegative = true;
+        cleaned = cleaned.slice(1, -1).trim();
+    }
+    cleaned = cleaned.replace(/[£$€¥\s,]/g, '');
+    if (isAccountingNegative && !cleaned.startsWith('-') && !cleaned.startsWith('+')) {
+        cleaned = `-${cleaned}`;
+    }
+    if (!cleaned || !/^[-+]?\d*(\.\d+)?$/.test(cleaned) || cleaned === '-' || cleaned === '+' || cleaned === '.' || cleaned === '-.' || cleaned === '+.') {
         return null;
     }
     const parsed = Number(cleaned);
@@ -48,7 +58,7 @@ function computeMode(values) {
  * 1. Normalizes headers and trims string cells
  * 2. Deduplicates identical rows (or by keyColumns if provided)
  * 3. Infers numeric vs categorical columns and imputes missing values (median for numeric, mode for categorical)
- * 4.Optionally clips numeric z-score outliers beyond zThreshold
+ * 4. Optionally clips numeric z-score outliers beyond zThreshold (excluding identifier/key columns)
  */
 function cleanTabularRows(rows, options = {}) {
     const {
@@ -68,11 +78,23 @@ function cleanTabularRows(rows, options = {}) {
         }, new Set())
     );
 
-    // Normalize keys and trim values
+    const protectedCols = new Set([
+        ...(Array.isArray(keyColumns) ? keyColumns.map((k) => String(k).trim()) : []),
+        'id',
+    ]);
+
+    // Normalize keys with arbitrary leading/trailing whitespace and trim values
     const normalized = rows.map((row) => {
+        const trimmedLookup = {};
+        for (const [rawKey, rawVal] of Object.entries(row || {})) {
+            const normKey = rawKey.trim();
+            if (trimmedLookup[normKey] === undefined || rawKey === normKey) {
+                trimmedLookup[normKey] = rawVal;
+            }
+        }
         const out = {};
         for (const col of columns) {
-            const rawVal = row[col] !== undefined ? row[col] : row[` ${col}`] ?? row[`${col} `];
+            const rawVal = trimmedLookup[col];
             out[col] = typeof rawVal === 'string' ? rawVal.trim() : rawVal;
         }
         return out;
@@ -109,7 +131,13 @@ function cleanTabularRows(rows, options = {}) {
             const std = Math.sqrt(variance);
             const scale = mad > 1e-9 ? mad : std;
             const center = mad > 1e-9 ? median : mean;
-            colMeta[col] = { type: 'numeric', imputeValue: median, center, scale };
+            colMeta[col] = {
+                type: 'numeric',
+                imputeValue: median,
+                center,
+                scale,
+                isIdentifier: protectedCols.has(col),
+            };
         } else {
             const strVals = nonMissing.map((v) => String(v).trim());
             colMeta[col] = { type: 'categorical', imputeValue: computeMode(strVals) ?? '' };
@@ -128,7 +156,7 @@ function cleanTabularRows(rows, options = {}) {
                 if (num === null) {
                     num = meta.imputeValue;
                     imputedCells += 1;
-                } else if (clipOutliers && meta.scale > 1e-9 && zThreshold > 0) {
+                } else if (clipOutliers && !meta.isIdentifier && meta.scale > 1e-9 && zThreshold > 0) {
                     const z = Math.abs((num - meta.center) / meta.scale);
                     if (z > zThreshold) {
                         const bound = meta.center + Math.sign(num - meta.center) * zThreshold * meta.scale;
